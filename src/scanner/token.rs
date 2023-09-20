@@ -1,10 +1,58 @@
-#![allow(unused)]
-use crate::token_type::TokenType;
-
 use std::fmt;
 
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum TokenType {
+    // Single-character tokens.
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
+
+    // One or two character tokens.
+    Bang,
+    BangEqual,
+    Assign, // ('=')
+    Equals, // ('==')
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+
+    // Literals.
+    Identifier,
+    String,
+    Number,
+
+    // Keywords
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+
+    EOF,
+}
+
 #[derive(Debug)]
-pub enum Object {
+pub(crate) enum Object {
     Num(f64),
     Str(String),
     Nil,
@@ -25,15 +73,22 @@ impl fmt::Display for Object {
 }
 
 #[derive(Debug)]
-pub struct Token {
-    ttype: TokenType,
-    lexeme: String,
-    literal: Option<Object>,
-    line: usize,
+pub(crate) struct Token {
+    pub ttype: TokenType,
+    pub lexeme: String,
+    pub literal: Option<Object>,
+    pub line: usize,
+    // span: (usize, usize),
 }
 
 impl Token {
-    pub fn new(ttype: TokenType, lexeme: String, literal: Option<Object>, line: usize) -> Self {
+    // TODO: implement it as span: (self.start, self.current)
+    pub(crate) fn new(
+        ttype: TokenType,
+        lexeme: String,
+        literal: Option<Object>,
+        line: usize,
+    ) -> Self {
         Token {
             ttype,
             lexeme,
@@ -42,7 +97,7 @@ impl Token {
         }
     }
 
-    pub fn eof(line: usize) -> Token {
+    pub(crate) fn eof(line: usize) -> Token {
         Token {
             ttype: TokenType::EOF,
             lexeme: String::from(""),
@@ -67,14 +122,3 @@ impl fmt::Display for Token {
         )
     }
 }
-
-/*
- * might be implemented as below
- *
-pub enum Token {
-    Literal { lexeme: String, literal: <...> },
-    Keywords { lexeme: String, literal: <...> },
-}
-
-
-*/

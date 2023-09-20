@@ -1,9 +1,13 @@
+#![allow(unused)]
+pub(crate) mod token;
+
 use std::collections::HashMap;
 
 use crate::error::LoxError;
-use crate::token::{Object, Token};
-use crate::token_type::TokenType;
+use token::{Object, Token, TokenType};
+// use crate::token_type::TokenType;
 
+#[derive(Debug)]
 pub struct Scanner {
     source: Vec<char>,
     tokens: Vec<Token>,
@@ -47,13 +51,14 @@ impl Scanner {
         }
     }
 
-    pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxError> {
+    pub(crate) fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxError> {
         let mut had_error: Option<LoxError> = None;
         while !self.is_at_end() {
             self.start = self.current;
             match self.scan_token() {
                 Ok(_) => {}
                 Err(e) => {
+                    // TODO: implement error using `miette` library
                     e.report("".to_string());
                     had_error = Some(e);
                 }
@@ -135,9 +140,10 @@ impl Scanner {
                 }
             }
 
-            ' ' => {}
-            '\r' => {}
-            '\t' => {}
+            ' ' | '\r' | '\t' => {
+                // ignore whitespaces
+            }
+
             '\n' => {
                 self.line += 1;
             }
@@ -146,9 +152,17 @@ impl Scanner {
                 self.handle_string();
             }
 
+            /*
+                a if a.is_alphabetic() || a == '_' => {
+                self.handle_string();
+                }
+                d if d.is_ascii_digit() => {
+                self.handle_number();
+                }
+            */
             _ => {
-                if self.is_digit(c) {
-                    self.number();
+                if c.is_ascii_digit() {
+                    self.handle_number();
                 } else if self.is_alpha(c) {
                     self.handle_identifier();
                 } else {
@@ -157,38 +171,10 @@ impl Scanner {
                         "Unexpected character".to_string(),
                     ));
                 }
+                // }
             }
         }
         Ok(())
-    }
-
-    fn is_match(&mut self, expected: char) -> bool {
-        if self.is_at_end() {
-            false
-        } else if self.char_at(self.current) != expected {
-            false
-        } else {
-            self.current += 1;
-            true
-        }
-
-        /*
-        match self.char_at(self.current) {
-            Some(ch) if *ch == expected => {
-                self.current += 1;
-                true
-            }
-            _ => false,
-        }
-        */
-    }
-
-    fn advance(&mut self) -> char {
-        let current_char = self.char_at(self.current);
-        // let result = *self.source.get(self.current).unwrap();
-        self.current += 1;
-        // result
-        current_char
     }
 
     fn add_token(&mut self, ttype: TokenType) {
@@ -200,21 +186,6 @@ impl Scanner {
 
         self.tokens
             .push(Token::new(ttype, lexeme, literal, self.line))
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
-    }
-
-    fn char_at(&self, idx: usize) -> char {
-        self.source[idx]
-    }
-
-    fn peek(&self) -> char {
-        if self.is_at_end() {
-            return '\0';
-        }
-        return self.char_at(self.current);
     }
 
     fn handle_string(&mut self) {
@@ -240,21 +211,26 @@ impl Scanner {
         self.add_token_obj(TokenType::String, Some(Object::Str(value)));
     }
 
-    fn is_digit(&self, c: char) -> bool {
-        return c >= '0' && c <= '9';
-    }
-
-    fn number(&mut self) {
+    fn handle_number(&mut self) {
+        /*
         while self.is_digit(self.peek()) {
+            self.advance();
+        }
+        */
+        while self.peek().is_ascii_digit() {
             self.advance();
         }
 
         // Look for a fractional part.
-        if self.peek() == '.' && self.is_digit(self.peek_next()) {
+        if self.peek() == '.' && self.peek_next().is_ascii_digit()
+        /*self.is_digit(self.peek_next())*/
+        {
             // Consume the "."
             self.advance();
 
-            while self.is_digit(self.peek()) {
+            while self.peek().is_ascii_digit()
+            /* self.is_digit(self.peek())*/
+            {
                 self.advance();
             }
         }
@@ -265,14 +241,6 @@ impl Scanner {
             TokenType::Number,
             Some(Object::Num(value.parse::<f64>().unwrap())),
         );
-    }
-
-    fn peek_next(&self) -> char {
-        if self.current + 1 >= self.source.len() {
-            '\0'
-        } else {
-            self.char_at(self.current + 1)
-        }
     }
 
     fn handle_identifier(&mut self) {
@@ -287,10 +255,49 @@ impl Scanner {
         self.add_token(ttype);
     }
 
+    fn is_match(&mut self, expected: char) -> bool {
+        if self.is_at_end() || self.char_at(self.current) != expected {
+            false
+        } else {
+            self.current += 1;
+            true
+        }
+    }
+
+    fn advance(&mut self) -> char {
+        let current_char = self.char_at(self.current);
+        self.current += 1;
+        current_char
+    }
+
+    fn peek(&self) -> char {
+        if self.is_at_end() {
+            return '\0';
+        }
+        return self.char_at(self.current);
+    }
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            '\0'
+        } else {
+            self.char_at(self.current + 1)
+        }
+    }
+
     fn is_alpha(&self, c: char) -> bool {
         (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
     }
+
     fn is_alpha_numeric(&self, c: char) -> bool {
-        self.is_alpha(c) || self.is_digit(c)
+        self.is_alpha(c) || c.is_ascii_digit() /* self.is_digit(c) */
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.current >= self.source.len()
+    }
+
+    fn char_at(&self, index: usize) -> char {
+        self.source[index]
     }
 }
