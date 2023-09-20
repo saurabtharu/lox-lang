@@ -1,76 +1,296 @@
+use std::collections::HashMap;
+
 use crate::error::LoxError;
-use crate::token::Token;
+use crate::token::{Object, Token};
 use crate::token_type::TokenType;
-use substring::Substring;
 
 pub struct Scanner {
-    source: String,
+    source: Vec<char>,
     tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
+    keywords: HashMap<&'static str, TokenType>,
 }
 
 impl Scanner {
     pub fn new(source: String) -> Scanner {
+        let keywords = [
+            ("and", TokenType::And),
+            ("class", TokenType::Class),
+            ("else", TokenType::Else),
+            ("false", TokenType::False),
+            ("for", TokenType::For),
+            ("fun", TokenType::Fun),
+            ("if", TokenType::If),
+            ("nil", TokenType::Nil),
+            ("or", TokenType::Or),
+            ("print", TokenType::Print),
+            ("return", TokenType::Return),
+            ("super", TokenType::Super),
+            ("this", TokenType::This),
+            ("true", TokenType::True),
+            ("var", TokenType::Var),
+            ("while", TokenType::While),
+        ]
+        .iter()
+        .cloned()
+        .collect();
+
         Scanner {
-            source,
+            source: source.chars().collect(),
             tokens: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
+            keywords,
         }
     }
 
     pub fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxError> {
+        let mut had_error: Option<LoxError> = None;
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_tokens();
+            match self.scan_token() {
+                Ok(_) => {}
+                Err(e) => {
+                    e.report("".to_string());
+                    had_error = Some(e);
+                }
+            }
         }
 
         self.tokens.push(Token::eof(self.line));
-        Ok(&self.tokens)
+        if let Some(e) = had_error {
+            Err(e)
+        } else {
+            Ok(&self.tokens)
+        }
+    }
+
+    fn scan_token(&mut self) -> Result<(), LoxError> {
+        let c = self.advance();
+
+        match c {
+            '(' => self.add_token(TokenType::LeftParen),
+            ')' => self.add_token(TokenType::RightParen),
+            '{' => self.add_token(TokenType::LeftBrace),
+            '}' => self.add_token(TokenType::RightBrace),
+            ',' => self.add_token(TokenType::Comma),
+            '.' => self.add_token(TokenType::Dot),
+            '-' => self.add_token(TokenType::Minus),
+            '+' => self.add_token(TokenType::Plus),
+            ';' => self.add_token(TokenType::Semicolon),
+            '*' => self.add_token(TokenType::Star),
+
+            // for matching `!` or `!=`
+            '!' => {
+                let ty = if self.is_match('=') {
+                    TokenType::BangEqual
+                } else {
+                    TokenType::Bang
+                };
+                self.add_token(ty);
+            }
+
+            // for matching `!` or `==`
+            '=' => {
+                let ty = if self.is_match('=') {
+                    TokenType::Equals
+                } else {
+                    TokenType::Assign
+                };
+                self.add_token(ty);
+            }
+
+            // for matching `!` or `<=`
+            '<' => {
+                let ty = if self.is_match('=') {
+                    TokenType::LessEqual
+                } else {
+                    TokenType::Less
+                };
+                self.add_token(ty);
+            }
+
+            // for matching `!` or `>=`
+            '>' => {
+                let ty = if self.is_match('=') {
+                    TokenType::GreaterEqual
+                } else {
+                    TokenType::Greater
+                };
+                self.add_token(ty);
+            }
+
+            // for matching '/' or '//' i.e for division of commenting
+            '/' => {
+                if self.is_match('/') {
+                    // A comment goes until the end of the line.
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
+                    }
+                } else {
+                    self.add_token(TokenType::Slash)
+                }
+            }
+
+            ' ' => {}
+            '\r' => {}
+            '\t' => {}
+            '\n' => {
+                self.line += 1;
+            }
+
+            '"' => {
+                self.handle_string();
+            }
+
+            _ => {
+                if self.is_digit(c) {
+                    self.number();
+                } else if self.is_alpha(c) {
+                    self.handle_identifier();
+                } else {
+                    return Err(LoxError::error(
+                        self.line,
+                        "Unexpected character".to_string(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn is_match(&mut self, expected: char) -> bool {
+        if self.is_at_end() {
+            false
+        } else if self.char_at(self.current) != expected {
+            false
+        } else {
+            self.current += 1;
+            true
+        }
+
+        /*
+        match self.char_at(self.current) {
+            Some(ch) if *ch == expected => {
+                self.current += 1;
+                true
+            }
+            _ => false,
+        }
+        */
+    }
+
+    fn advance(&mut self) -> char {
+        let current_char = self.char_at(self.current);
+        // let result = *self.source.get(self.current).unwrap();
+        self.current += 1;
+        // result
+        current_char
+    }
+
+    fn add_token(&mut self, ttype: TokenType) {
+        self.add_token_obj(ttype, None);
+    }
+
+    fn add_token_obj(&mut self, ttype: TokenType, literal: Option<Object>) {
+        let lexeme: String = self.source[self.start..self.current].iter().collect();
+
+        self.tokens
+            .push(Token::new(ttype, lexeme, literal, self.line))
     }
 
     fn is_at_end(&self) -> bool {
         self.current >= self.source.len()
     }
 
-    //     fn scan_token(&self) {
-    //         let c = self.advance();
+    fn char_at(&self, idx: usize) -> char {
+        self.source[idx]
+    }
 
-    //         match c {
-    //             '(' => self.add_token(TokenType::LeftParam),
-    //             ')' => self.add_token(TokenType::RightParam),
-    //             '{' => self.add_token(TokenType::LeftBrace),
-    //             '}' => self.add_token(TokenType::RightBrace),
-    //             ',' => self.add_token(TokenType::Comma),
-    //             '.' => self.add_token(TokenType::Dot),
-    //             '-' => self.add_token(TokenType::Minus),
-    //             '+' => self.add_token(TokenType::Plus),
-    //             ';' => self.add_token(TokenType::Semicolon),
-    //             '*' => self.add_token(TokenType::Star),
+    fn peek(&self) -> char {
+        if self.is_at_end() {
+            return '\0';
+        }
+        return self.char_at(self.current);
+    }
 
-    //             // _ => {
+    fn handle_string(&mut self) {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+            self.advance();
+        }
 
-    //             // }
-    //         }
-    //     }
+        if self.is_at_end() {
+            LoxError::error(self.line, "Unterminated string.".to_string());
+            return;
+        }
 
-    //     fn advance(&self) -> u8 {
-    //         return self.char_at(self.current += 1);
-    //     }
+        // the closing ".
+        self.advance();
 
-    //     fn add_token(&self, ttype: TokenType) {
-    //         self.add_token_n(ttype, None);
-    //     }
+        // Trim the surrounding quotes.
+        let value: String = self.source[self.start + 1..self.current - 1]
+            .iter()
+            .collect();
+        self.add_token_obj(TokenType::String, Some(Object::Str(value)));
+    }
 
-    //     fn add_token_n(&mut self, ttype: TokenType, literal) {
-    //         // let lexeme = self.source[self.start..self.current].to_string();
+    fn is_digit(&self, c: char) -> bool {
+        return c >= '0' && c <= '9';
+    }
 
-    //         let lexeme = self.source
-    //             .substring(self.start, self.current)
-    //             .to_string();
-    //         self.tokens.push(Token::new(ttype, lexeme, literal, self.line))
-    //     }
+    fn number(&mut self) {
+        while self.is_digit(self.peek()) {
+            self.advance();
+        }
+
+        // Look for a fractional part.
+        if self.peek() == '.' && self.is_digit(self.peek_next()) {
+            // Consume the "."
+            self.advance();
+
+            while self.is_digit(self.peek()) {
+                self.advance();
+            }
+        }
+
+        let value: String = self.source[self.start..self.current].iter().collect();
+
+        self.add_token_obj(
+            TokenType::Number,
+            Some(Object::Num(value.parse::<f64>().unwrap())),
+        );
+    }
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            '\0'
+        } else {
+            self.char_at(self.current + 1)
+        }
+    }
+
+    fn handle_identifier(&mut self) {
+        while self.is_alpha_numeric(self.peek()) {
+            self.advance();
+        }
+        let identifier: String = self.source[self.start..self.current].iter().collect();
+        let ttype = match self.keywords.get(&identifier.as_str()).cloned() {
+            Some(token) => token,
+            None => TokenType::Identifier,
+        };
+        self.add_token(ttype);
+    }
+
+    fn is_alpha(&self, c: char) -> bool {
+        (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+    }
+    fn is_alpha_numeric(&self, c: char) -> bool {
+        self.is_alpha(c) || self.is_digit(c)
+    }
 }

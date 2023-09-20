@@ -57,14 +57,15 @@ fn run_prompt() {
             }
             match run(line) {
                 Ok(_) => {}
-                Err(m) => {
-                    m.report("".to_string());
-                    // std::process::exit(65);
+                Err(_) => {
+                    // Ignore: error was already reported
                 }
             }
         } else {
             break;
         }
+        print!("> ");
+        stdout().flush().unwrap();
     }
 }
 
@@ -73,7 +74,7 @@ fn run(source: String) -> Result<(), LoxError> {
     let tokens = scanner.scan_tokens()?;
 
     for token in tokens {
-        println!("{:?}", token);
+        println!("\t{:?}", token);
     }
     Ok(())
 }

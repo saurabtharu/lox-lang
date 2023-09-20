@@ -1,9 +1,9 @@
 #![allow(unused)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TokenType {
     // Single-character tokens.
-    LeftParam,
-    RightParam,
+    LeftParen,
+    RightParen,
     LeftBrace,
     RightBrace,
     Comma,
@@ -17,8 +17,8 @@ pub enum TokenType {
     // One or two character tokens.
     Bang,
     BangEqual,
-    Equal,      // ('=')
-    EqualEqual, // ('==')
+    Assign, // ('=')
+    Equals, // ('==')
     Greater,
     GreaterEqual,
     Less,
@@ -32,6 +32,7 @@ pub enum TokenType {
     // Keywords
     And,
     Class,
+    Else,
     False,
     Fun,
     For,
