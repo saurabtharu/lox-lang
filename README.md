@@ -6,4 +6,4 @@
 
 
 ## References
-[Crafting Interpreters](https://craftinginterpreters.com/)
+- [Crafting Interpreters](https://craftinginterpreters.com/)

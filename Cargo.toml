@@ -3,7 +3,6 @@ name = "rlox"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-substring = "1.4.5"
+miette = { version = "5.10.0", features = ["fancy"] }
+thiserror = "1.0.48"
