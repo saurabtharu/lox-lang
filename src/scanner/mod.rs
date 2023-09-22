@@ -1,9 +1,8 @@
-#![allow(unused)]
 pub(crate) mod token;
 
 use std::collections::HashMap;
 
-use crate::error::LoxError;
+use crate::error::{LoxError, SyntaxError};
 use token::{Object, Token, TokenType};
 // use crate::token_type::TokenType;
 
@@ -18,7 +17,7 @@ pub struct Scanner {
 }
 
 impl Scanner {
-    pub fn new(source: String) -> Scanner {
+    pub fn new(source: &String) -> Scanner {
         let keywords = [
             ("and", TokenType::And),
             ("class", TokenType::Class),
@@ -51,29 +50,48 @@ impl Scanner {
         }
     }
 
-    pub(crate) fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxError> {
-        let mut had_error: Option<LoxError> = None;
+    pub(crate) fn scan_tokens(&mut self) -> Result<Vec<Token>, LoxError> {
+        // let mut had_error: Option<LoxError> = None;
+        let mut source_errors = Vec::new();
         while !self.is_at_end() {
             self.start = self.current;
             match self.scan_token() {
                 Ok(_) => {}
-                Err(e) => {
+                Err((err_msg, help_msg)) => {
+                    source_errors.push(SyntaxError {
+                        line: self.line,
+                        span: (self.start, self.current).into(),
+                        err_message: err_msg,
+                        help_message: help_msg,
+                    });
                     // TODO: implement error using `miette` library
-                    e.report("".to_string());
-                    had_error = Some(e);
+                    // e.report("".to_string());
+                    // had_error = Some(e);
                 }
             }
         }
 
-        self.tokens.push(Token::eof(self.line));
-        if let Some(e) = had_error {
-            Err(e)
+        self.tokens.push(Token::new(
+            TokenType::EOF,
+            "".to_string(),
+            None,
+            self.line,
+            (self.start, self.current),
+        ));
+
+        if !source_errors.is_empty() {
+            return Err(LoxError::SyntaxErrors(source_errors));
         } else {
-            Ok(&self.tokens)
+            Ok(self.tokens.clone())
         }
+        // if let Some(e) = had_error {
+        //     Err(e)
+        // } else {
+        //     Ok(&self.tokens)
+        // }
     }
 
-    fn scan_token(&mut self) -> Result<(), LoxError> {
+    fn scan_token(&mut self) -> Result<(), (String, String)> {
         let c = self.advance();
 
         match c {
@@ -135,7 +153,12 @@ impl Scanner {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
-                } else {
+                }
+                /* else if self.is_match('*') {
+                    // multi line comment start
+                    self.scan_comment();
+                }*/
+                else {
                     self.add_token(TokenType::Slash)
                 }
             }
@@ -149,7 +172,7 @@ impl Scanner {
             }
 
             '"' => {
-                self.handle_string();
+                self.handle_string()?;
             }
 
             /*
@@ -162,13 +185,17 @@ impl Scanner {
             */
             _ => {
                 if c.is_ascii_digit() {
-                    self.handle_number();
+                    _ = self.handle_number();
                 } else if self.is_alpha(c) {
                     self.handle_identifier();
                 } else {
-                    return Err(LoxError::error(
-                        self.line,
-                        "Unexpected character".to_string(),
+                    // return Err(LoxError::error(
+                    //     self.line,
+                    //     "Unexpected character".to_string(),
+                    // ));
+                    return Err((
+                        "unexpected character".to_string(),
+                        "try removing the character".to_string(),
                     ));
                 }
                 // }
@@ -177,6 +204,17 @@ impl Scanner {
         Ok(())
     }
 
+    // fn scan_comment(&mut self) {
+    //     let mut nesting = 1;
+
+    //     while self.peek() != '*' {
+    //         if self.is_match('/') {
+    //             break;
+    //         }
+    //         self.advance();
+    //     }
+    // }
+
     fn add_token(&mut self, ttype: TokenType) {
         self.add_token_obj(ttype, None);
     }
@@ -184,11 +222,18 @@ impl Scanner {
     fn add_token_obj(&mut self, ttype: TokenType, literal: Option<Object>) {
         let lexeme: String = self.source[self.start..self.current].iter().collect();
 
-        self.tokens
-            .push(Token::new(ttype, lexeme, literal, self.line))
+        // self.tokens
+        //     .push(Token::new(ttype, lexeme, literal, self.line))
+        self.tokens.push(Token::new(
+            ttype,
+            lexeme,
+            literal,
+            self.line,
+            (self.start, self.current),
+        ))
     }
 
-    fn handle_string(&mut self) {
+    fn handle_string(&mut self) -> Result<(), (String, String)> {
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
@@ -197,8 +242,13 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            LoxError::error(self.line, "Unterminated string.".to_string());
-            return;
+            return Err((
+                "unterminated string".to_string(),
+                "add a '\"' after the string".to_string(),
+            ));
+
+            // LoxError::error(self.line, "Unterminated string.".to_string());
+            // return;
         }
 
         // the closing ".
@@ -209,9 +259,11 @@ impl Scanner {
             .iter()
             .collect();
         self.add_token_obj(TokenType::String, Some(Object::Str(value)));
+
+        Ok(())
     }
 
-    fn handle_number(&mut self) {
+    fn handle_number(&mut self) -> Result<(), (String, String)> {
         /*
         while self.is_digit(self.peek()) {
             self.advance();
@@ -237,10 +289,16 @@ impl Scanner {
 
         let value: String = self.source[self.start..self.current].iter().collect();
 
-        self.add_token_obj(
-            TokenType::Number,
-            Some(Object::Num(value.parse::<f64>().unwrap())),
-        );
+        match value.parse::<f64>() {
+            Ok(num) => {
+                self.add_token_obj(TokenType::Number, Some(Object::Num(num)));
+                Ok(())
+            }
+            Err(_) => Err((
+                "couldn't parse the number".to_string(),
+                "make sure you are only using integers or floating point numbers".to_string(),
+            )),
+        }
     }
 
     fn handle_identifier(&mut self) {

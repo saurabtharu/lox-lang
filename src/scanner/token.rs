@@ -51,7 +51,7 @@ pub(crate) enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub(crate) enum Object {
     Num(f64),
     Str(String),
@@ -72,13 +72,13 @@ impl fmt::Display for Object {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub(crate) struct Token {
     pub ttype: TokenType,
     pub lexeme: String,
     pub literal: Option<Object>,
     pub line: usize,
-    // span: (usize, usize),
+    pub span: (usize, usize),
 }
 
 impl Token {
@@ -88,32 +88,37 @@ impl Token {
         lexeme: String,
         literal: Option<Object>,
         line: usize,
+        span: (usize, usize),
     ) -> Self {
         Token {
             ttype,
             lexeme,
             literal,
             line,
+            span,
         }
     }
 
-    pub(crate) fn eof(line: usize) -> Token {
-        Token {
-            ttype: TokenType::EOF,
-            lexeme: String::from(""),
-            literal: None,
-            line,
-        }
-    }
+    // pub(crate) fn eof(line: usize) -> Token {
+    //     Token {
+    //         ttype: TokenType::EOF,
+    //         lexeme: String::from(""),
+    //         literal: None,
+    //         line,
+    //     }
+    // }
 }
 
 impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:#?} {} {}",
-            self.ttype,
+            "[line {:02} @ {:02}:{:02}]   {}: {:<30?} {:<40}",
+            self.line,
+            self.span.0,
+            self.span.1,
             self.lexeme,
+            self.ttype,
             if let Some(literal) = &self.literal {
                 literal.to_string()
             } else {
@@ -121,4 +126,17 @@ impl fmt::Display for Token {
             }
         )
     }
+    // fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    //     write!(
+    //         f,
+    //         "{:#?} {} {}",
+    //         self.ttype,
+    //         self.lexeme,
+    //         if let Some(literal) = &self.literal {
+    //             literal.to_string()
+    //         } else {
+    //             "None".to_string()
+    //         }
+    //     )
+    // }
 }

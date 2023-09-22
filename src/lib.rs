@@ -1,3 +1,4 @@
+use miette::{self, NamedSource,Report};
 use std::fs::{self};
 use std::io::{self, stdout, BufRead, Write};
 
@@ -7,48 +8,61 @@ pub mod scanner;
 use error::LoxError;
 use scanner::Scanner;
 
-pub fn run(source: String) -> Result<(), LoxError> {
-    let mut scanner = Scanner::new(source);
-    let tokens = scanner.scan_tokens()?;
+pub fn run_file(path: &String) -> miette::Result<()> {
+    let buf = fs::read_to_string(path).map_err(LoxError::IOError)?;
 
-    for token in tokens {
-        println!("{:?}", token);
-    }
-    Ok(())
-}
-
-pub fn run_file(path: &String) -> io::Result<()> {
-    let buf = fs::read_to_string(path)?;
+    run(&buf).map_err(|err| {
+        let named_source = NamedSource::new(path, buf);
+        err.with_source_code(named_source)
+    })?;
+    /*
     match run(buf) {
         Ok(_) => {}
         Err(message) => {
-            message.report("".to_string());
-            std::process::exit(65);
+
+            // message.report("".to_string());
+            // std::process::exit(65);
         }
     }
+    */
     Ok(())
 }
 
-pub fn run_prompt() {
+pub fn run_prompt() -> miette::Result<()> {
     let stdin = io::stdin();
 
     print!("> ");
-    stdout().flush().unwrap();
+    stdout().flush().map_err(LoxError::IOError)?;
     for line in stdin.lock().lines() {
         if let Ok(line) = line {
             if line.is_empty() {
                 break;
             }
-            match run(line) {
-                Ok(_) => {}
-                Err(_) => {
-                    // Ignore: error was already reported
-                }
-            }
+            run(&line).map_err(|err| err.with_source_code(line))?;
+            // match run(&line) {
+            //     Ok(_) => {}
+            //     Err(err) => {
+            //         err.with_source_code(line)?
+            //         // Ignore: error was already reported
+            //     }
+            // }
         } else {
             break;
         }
         print!("> ");
         stdout().flush().unwrap();
     }
+    Ok(())
+}
+
+pub fn run(source: &String) -> miette::Result<()> {
+    let mut scanner = Scanner::new(source);
+    let tokens = scanner.scan_tokens()?;
+
+    // println!("line  (from:to)     Lexeme \t\tToken Type \tLiteral ");
+    // println!("----------------------------------------------------");
+    for token in tokens {
+        println!("{:?}", token);
+    }
+    Ok(())
 }
