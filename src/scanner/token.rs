@@ -51,7 +51,7 @@ pub(crate) enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub(crate) enum Object {
     Num(f64),
     Str(String),
@@ -72,7 +72,7 @@ impl fmt::Display for Object {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub(crate) struct Token {
     pub ttype: TokenType,
     pub lexeme: String,
@@ -113,7 +113,7 @@ impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "[line {} @ {}:{}] {}: {:?} {}",
+            "[line {:02} @ {:02}:{:02}]   {}: {:<30?} {:<40}",
             self.line,
             self.span.0,
             self.span.1,

@@ -7,20 +7,35 @@ use crate::scanner::token::Token;
 #[derive(Error, Diagnostic, Debug)]
 pub enum LoxError {
     /* 
-    The #[error(transparent)] attribute on the first variant IOError indicates that this variant should transparently wrap the std::io::Error type. 
-    This means that if an std::io::Error is encountered, it will be automatically converted to a LoxError::IOError variant.
+    The #[error(transparent)] attribute on the first variant `IOError` indicates that this variant should transparently wrap the `std::io::Error` type. 
+    This means that if an `std::io::Error` is encountered, it will be automatically converted to a `LoxError::IOError` variant.
+    */
+
+    /*
+        The #[diagnostic] attribute is used to define a diagnostic code for the error. 
     */
     #[error(transparent)]
     #[diagnostic(
-        code(lox_error::io_error),
+        code(lox_error::IO_error),
         // url(docsrs),
         // help("try doing it better next time?")
     )]
     IOError(#[from] std::io::Error),
+
+    /*
+        variant is used to represent errors that occur during the parsing of a Lox program
+    */
+    /*
+    The #[error()] attribute is used to define the error message for an enum variant in Rust
+    */
     #[error("compilation failed because of syntax errors")]
-    #[diagnostic(code(lox_error::syntax_errors))]
+    #[diagnostic(code(lox_error::Syntax_error))]
     SyntaxErrors(#[related] Vec<SyntaxError>),
 
+
+
+    /// The {err_message} and {line} placeholders in the error message will be replaced with 
+    /// the values of the err_message and line fields, respectively, when the error is formatted.
     #[diagnostic(code(lox_error::arithmetic_error))]
     #[error("arithmetic error: {err_message} at line {line}")]
     RuntimeError {

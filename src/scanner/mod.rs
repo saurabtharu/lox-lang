@@ -50,7 +50,7 @@ impl Scanner {
         }
     }
 
-    pub(crate) fn scan_tokens(&mut self) -> Result<&Vec<Token>, LoxError> {
+    pub(crate) fn scan_tokens(&mut self) -> Result<Vec<Token>, LoxError> {
         // let mut had_error: Option<LoxError> = None;
         let mut source_errors = Vec::new();
         while !self.is_at_end() {
@@ -82,7 +82,7 @@ impl Scanner {
         if !source_errors.is_empty() {
             return Err(LoxError::SyntaxErrors(source_errors));
         } else {
-            Ok(&self.tokens)
+            Ok(self.tokens.clone())
         }
         // if let Some(e) = had_error {
         //     Err(e)
@@ -172,7 +172,7 @@ impl Scanner {
             }
 
             '"' => {
-                _ = self.handle_string();
+                self.handle_string()?;
             }
 
             /*
